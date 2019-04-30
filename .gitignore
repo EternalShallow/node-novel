@@ -14,3 +14,4 @@ server/build
 .DS_Store?
 # store folder
 book/*
+package-lock.json
