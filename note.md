@@ -1,12 +1,10 @@
 # async+phantomjs制作nodejs的小说爬虫
 ## 内容要点
 **一步一脚印实现一个爬虫,文章内容较长,建议在pc下阅读**
-**[源码地址](https://github.com/Sunshine168/fetch-novel)**
-phantomjs捕获内容
-详细介绍通过async.mapLimit并发处理,结合定时器进行延时执行
-数据存放到mongodb
-数据输出成文件 
-(如有错误请大家指出，一起学习)
+**[源码地址](https://github.com/EternalShallow/node-novel/)**
+phantomjs捕获内容 详细介绍通过async.mapLimit并发处理,结合定时器进行延时执行
+数据输出成文件保存到本地
+ (如有错误请大家指出，一起学习)
 ### 介绍(有了解可以直接跳过)
 关于[PhantomJS](http://www.infoq.com/cn/news/2015/01/phantomjs-webkit-javascript-api)
  首先介绍一下phantomjs
@@ -76,7 +74,7 @@ node test.js
 ```
 
 
-[我的栗子🌰](https://github.com/Sunshine168/ife/tree/master/phantomjs_1)
+[参考](https://github.com/Sunshine168/ife/tree/master/phantomjs_1)
 
 ```
 const phantom = require('phantom');//导入模块
@@ -236,24 +234,24 @@ const mkdirp = require('mkdirp')
 const program = require('commander');
 const fs = require('async-file')
 const path = require('path')
-	//设置用户代理
+//设置用户代理
 const userAgent = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36`
-	/*
-	命令行参数
-	p -替换原文本中的换行空格
-	f -保存为文件
-	t 自定义输出路径
-    u 抓取单章的url
-	*/
+/*
+命令行参数
+p -替换原文本中的换行空格
+f -保存为文件
+t 自定义输出路径
+u 抓取单章的url
+*/
 program
-	.version('0.1.0')
-	.option('-p, --puer', 'puerMode')
-	.option('-f, --file', 'save2File')
-	.option('-t, --path [path]', 'outPutPath')
-	.option('-u, --url [url]', 'url')
-	.parse(process.argv);
+    .version('0.1.0')
+    .option('-p, --puer', 'puerMode')
+    .option('-f, --file', 'save2File')
+    .option('-t, --path [path]', 'outPutPath')
+    .option('-u, --url [url]', 'url')
+    .parse(process.argv);
 if (!program.url) {
-	return;
+    return;
 
 }
 const URL = program.url;
@@ -263,92 +261,107 @@ const DEFAULT_PATH = '/book/default/';
 替换br和&nbsp标签
 */
 function puer(str) {
-	if (!str) {
-		return
-	}
-	str = str.replace(/<br\s*\/?>/gi, "\r\n");
-	str = str.replace(/&nbsp;/g, " ")
-	return str
+    if (!str) {
+        return
+    }
+    str = str.replace(/<br\s*\/?>/gi, "\r\n");
+    str = str.replace(/&nbsp;/g, " ")
+    return str
 }
+
 /*
-test url 
+test url
 node fetchChapter.js -u http://www.qu.la/book/5443/3179374.html -f -p
 */
 
-(async function() {
-	//创建实例
-	const instance = await phantom.create()
-		//创建页面容器
-	const page = await instance.createPage()
-	page.setting("userAgent", userAgent)
-	const status = await page.open(URL),
-		code = 1;
-	if (status !== 'success') {
-		code = -1;
-		return;
-	} else {
-		// await page.includeJs("https://cdn.bootcss.com/jquery/1.12.4/jquery.js")
-		// await page.render('germy.png');
-		var start = Date.now();
-		var result = await page.evaluate(function() {
-			//移除一些无关内容(等于直接在结果网页上的dom上进行操作)
-			//请注意这里如果调用console.log()是无效的!
-			$("#content a:last-child").remove()
-			$("#content script:last-child").remove()
-			$("#content div:last-child").remove()
-			$("#content script:last-child").remove()
-			return ({
-				title: $("h1").html(),
-				content: $("#content").html()
-			});
-		})
-		if (result.title == '' || result.content == '') {
-			//内容为空捕获失败
-			console.log(JSON.stringify({
-				code: -1
-			}))
-			return
-		} else {
-			//判断参数进一步处理
-			if (program.puer) {
-				var context = puer(result.content)
-			}
-			//文件模式处理后进行保存到文件.返回文件路径
-			if (program.file) {
+(async function () {
+    let code = 1
+    //创建实例
+    const instance = await phantom.create()
+    //创建页面容器
+    const page = await instance.createPage()
+    page.setting("userAgent", userAgent)
+    const status = await page.open(URL)
+    if (status !== 'success') {
+        code = -1;
+        return;
+    } else {
+        var start = Date.now();
+        var result = await page.evaluate(function () {
+            //移除一些无关内容(等于直接在结果网页上的dom上进行操作)
+            //请注意这里如果调用console.log()是无效的!
+            $("#content a:last-child").remove()
+            $("#content script:last-child").remove()
+            $("#content div:last-child").remove()
+            $("#content script:last-child").remove()
+            return ({
+                novelName: $("#page_set").next().next().html(),
+                title: $("h1").html(),
+                content: $("#content").html()
 
-				let path = ""
-				if (program.path) {
-					//自定义路径
-				} else {
-					path = DEFAULT_PATH;
-					//避免文件夹不存在,__dirname指向的是文件所在路径
-					mkdirp(__dirname + path, (err) => {
-						if (err) {
-							console.log(err);
-						}
-					});
-					//拼接出文件输出的路径
-					path += result.title + ".txt";
-					await fs.writeFile(__dirname + path, context)
-						// return;
-						//输出文件名
-					console.log(JSON.stringify({
-						code: 1,
-						filePath: path
-					}))
-				}
-			} else {
-				console.log(JSON.stringify({
-					code: 1,
-					content: result
-				}));
-			}
+            });
+        })
+        if (result.title == '' || result.content == '') {
+            //内容为空捕获失败
+            console.log(JSON.stringify({
+                code: -1
+            }))
+            return
+        } else {
+            //判断参数进一步处理
+            if (program.puer) {
+                var context = '---\n' +
+                    'layout: \'[literature]\'\n' +
+                    'title: ' + result.title + '\n'+
+                    'date: ' + new Date().getFullYear() + '-' + ((new Date().getMonth() + 1) > 10 ? (new Date().getMonth() + 1) : ('0' + (new Date().getMonth() + 1))) + '-' + (new Date().getDate() > 10 ? new Date().getDate() : ('0' + new Date().getDate())) + ' ' + new Date().getHours() + ':' + new Date().getMinutes() + ':'  + new Date().getSeconds() + '\n' +
+                    'tags: [文学,小说,'+ result.novelName +']\n' +
+                    'copyright: true\n' +
+                    'toc_number: true\n' +
+                    'categories: [文学,小说,'+ result.novelName +']\n' +
+                    'comments: true\n' +
+                    'toc: true\n' +
+                    'abbrlink: f6d1cfff\n' +
+                    'description: ' + result.content.trim().substring(0,20) + '...'  +'\n' +
+                        '---'
+                context += puer(result.content)
+            }
+            //文件模式处理后进行保存到文件.返回文件路径
+            if (program.file) {
 
-		}
-	}
-	//exit
-	await instance.exit();
+                let path = ""
+                if (program.path) {
+                    //自定义路径
+                } else {
+                    path = DEFAULT_PATH;
+                    //避免文件夹不存在,__dirname指向的是文件所在路径
+                    mkdirp( __dirname + path, (err) => {
+                    // mkdirp('../' +  __dirname + path, (err) => {
+                        if (err) {
+                            console.log(err);
+                        }
+                    })
+                    //拼接出文件输出的路径
+                    path += result.title + ".md";
+                    await fs.writeFile(__dirname  + path, context)
+                    //输出文件名
+                    console.log(JSON.stringify({
+                        code: 1,
+                        filePath: path
+                    }))
+                }
+            } else {
+                console.log(JSON.stringify({
+                    code: 1,
+                    content: result
+                }));
+            }
+
+        }
+    }
+    //exit
+    await instance.exit();
 })()
+
 ```
 
 ### 拓展
@@ -374,8 +387,13 @@ node fetchChapter.js -u http://www.qu.la/book/5443/3179374.html -f -p
 ```
 const exec = require('child_process').exec;
 const execAsync = require('async-child-process').execAsync;
+const async = require('async')
 const delayAsync = require('./asyncFetch').delayAsync;
 const program = require('commander');
+var fs = require('fs');
+const util = require('util')
+const co = require('co')
+const readAsync = util.promisify(fs.readFile)
 let cmd;
 /*
 s 是章节开始(下标是0,所以需要手动减一,第一章就是 0)
@@ -411,40 +429,129 @@ if (!program.start || !program.end) {
 
 //
 (async function() {
-
-	const {
-		stdout
-		//调取子进程 执行cmd
-	} = await execAsync(cmd, {
+	let stdout = ''
+	await execAsync(cmd, {
 		//default value of maxBuffer is 200KB.
 		maxBuffer: 1024 * 500
 	});
-	let data = JSON.parse(stdout),
-		start = program.start,
-		end = program.end,
-		limit = program.limit,
-		dataList = data['dataList'],
-		fetchResult = null;
-		//use to debug 
-		// let dataList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-		if (!dataList || data.length <= 0) {
-			return
+	console.log(111)
+    await fs.readFile('./mock/bookInfo.json',function(err,res){
+		if(err){
+			console.error('write error');
 		}
+        stdout = res.toString()
+		console.log(222)
+        console.log(333)
+        let data = JSON.parse(stdout),
+            start = parseInt(program.start),
+            end = parseInt(program.end),
+            limit = parseInt(program.limit),
+            dataList = data['dataList'],
+            fetchResult = null;
+        //use to debug
+        // let dataList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        if (!dataList || data.length <= 0) {
+            return
+        }
+        console.log(444)
+        //分发任务 每10s调取一次并发抓取10条记录
+        //截取需要的章节数
+        /*根据章节,章节是一开始,默认无序章*/
+        //dataList, start, end, limit
+        //下面是抓每章内容
+        try {
+            fetchResult =  delayAsync(dataList, start, end, limit);
+            console.log(fetchResult)
+        } catch (e) {
+            console.log(e)
+        }
+	})
 
-
-
-		// console.log(dataList)
-		//分发任务 每10s调取一次并发抓取10条记录 
-		//截取需要的章节数
-		/*根据章节,章节是一开始,默认无序章*/
-		//dataList, start, end, limit
-		//下面是把要抓取的内容放置到delayAsync中,后文讲述delayAsync
-	try {
-		fetchResult = await delayAsync(dataList, parseInt(start), parseInt(end), parseInt(limit));
-	} catch (e) {
-		console.log(e)
-	}
 })()
+const exec = require('child_process').exec;
+const execAsync = require('async-child-process').execAsync;
+const async = require('async')
+const delayAsync = require('./asyncFetch').delayAsync;
+const program = require('commander');
+var fs = require('fs');
+const util = require('util')
+const co = require('co')
+const readAsync = util.promisify(fs.readFile)
+let cmd;
+/*
+s 是章节开始(下标是0,所以需要手动减一,第一章就是 0)
+e 是结束章节数
+l 是并发数
+m 模式
+b 书的编号
+test command:
+node taskHandler.js -s 0 -e 10 -l 3 -b 5443
+*/
+program
+	.version('0.1.0')
+	.option('-s, --start [start]', 'start chapter', 0)
+	.option('-e, --end [end]', 'end chapter')
+	.option('-l, --limit [limit]', 'limit async', 3)
+	.option('-m, --mode [mode]', 'Add bbq sauce', 2)
+	.option('-b, --book [book]', 'book number')
+	.parse(process.argv);
+/*
+ 第一步获取章节连接,第二部获取章节内容并进行输出
+ 输出方式一 输出到数据库.(未实现)
+ 输出方式二 文件输出(在关注react-pdf,希望支持pdf输出)
+*/
+if (!program.book) {
+	return
+} else {
+	cmd = `node fetchAllChapters.js -b ${program.book}`;
+}
+if (!program.start || !program.end) {
+	console.log("must input with start-chapter and end-chapter ")
+	return;
+}
+
+//
+(async function() {
+	let stdout = ''
+	await execAsync(cmd, {
+		//default value of maxBuffer is 200KB.
+		maxBuffer: 1024 * 500
+	});
+	console.log(111)
+    await fs.readFile('./mock/bookInfo.json',function(err,res){
+		if(err){
+			console.error('write error');
+		}
+        stdout = res.toString()
+		console.log(222)
+        console.log(333)
+        let data = JSON.parse(stdout),
+            start = parseInt(program.start),
+            end = parseInt(program.end),
+            limit = parseInt(program.limit),
+            dataList = data['dataList'],
+            fetchResult = null;
+        //use to debug
+        // let dataList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        if (!dataList || data.length <= 0) {
+            return
+        }
+        console.log(444)
+        //分发任务 每10s调取一次并发抓取10条记录
+        //截取需要的章节数
+        /*根据章节,章节是一开始,默认无序章*/
+        //dataList, start, end, limit
+        //下面是抓每章内容
+        try {
+            fetchResult =  delayAsync(dataList, start, end, limit);
+            console.log(fetchResult)
+        } catch (e) {
+            console.log(e)
+        }
+	})
+
+})()
+
 
 ```
 
@@ -717,319 +824,14 @@ module.exports = {
 
 
 
-### 储存到mongodb
-这里使用的数据库驱动模块是 [mongolass](https://github.com/mongolass/mongolass)
-
-
-#### 第一步配置mongolass并添加模型
-
-```
-const Mongolass = require('mongolass');
-const moment = require('moment');
-const objectIdToTimestamp = require('objectid-to-timestamp');
-const mongolass = new Mongolass();
-//储存的库的url 
-mongolass.connect('mongodb://localhost:27017/novel');
-// 根据 id 生成创建时间 created_at
-mongolass.plugin('addCreatedAt', {
-  afterFind: function(results) {
-    results.forEach(function(item) {
-      item.created_at = moment(objectIdToTimestamp(item._id)).format('YYYY-MM-DD HH:mm');
-    });
-    return results;
-  },
-  afterFindOne: function(result) {
-    if (result) {
-      result.created_at = moment(objectIdToTimestamp(result._id)).format('YYYY-MM-DD HH:mm');
-    }
-    return result;
-  }
-});
-/*
-  下面模型的意思是
-  Book表
-  字段      属性
-  bookNum  string
-  url      stirng
-  chapters 对象数组 - 对象的属性是index - number ...类推
-*/
-exports.Book = mongolass.model('Book', {
-  bookNum: {
-    type: 'string'
-  },
-  url: {
-    type: 'string'
-  },
-  chapters: [{
-    index: {
-      type: "number"
-    },
-    link: {
-      type: "string"
-    },
-    title: {
-      type: "string"
-    }
-  }]
-});
-//书模型
-exports.Book.index({
-  bookNum: 1
-}, {
-  unique: true
-}).exec(); // 根据书本编号找到书本的章节，书编号全局唯一
-
-/*
-  下面模型的意思是
-  Chapter表
-  字段      属性
-  bookNum  string
-  start    number
-  end      number
-  chapters 对象数组 - 对象的属性是code - number ...类推
-*/
-exports.Chapter = mongolass.model('Chapter', {
-  bookNum: {
-    type: 'string'
-  },
-  start: {
-    type: 'number'
-  },
-  end: {
-    type: 'number'
-  },
-  chapters: [{
-    code: {
-      type: 'number'
-    },
-    filePath: {
-      type: 'string'
-    },
-    index: {
-      type: 'number'
-    }
-  }]
-});
-
-//抓取一次章节的模型
-exports.Chapter.index({
-  bookNum: 1
-}, {
-  unique: true
-}).exec(); // 根据书本编号找到书本的章节，用户名全局唯一
-```
-
-
-#### 添加模型
-
-Book
-
-```
-const Book = require('../lib/mongo').Book;
-
-module.exports = {
-  // 保存章节内容
-  create: (book) => {
-    return Book.create(book).exec();
-  },
-  //通过书编号获取记录
-  getBookByBookNum: (bookNum) => {
-    return Book
-      .findOne({
-        bookNum: bookNum
-      })
-    .addCreatedAt()
-      .exec();
-  },
-  //通过编号更新书数据
-  updateBookByBookNum: (bookNum, book) => {
-    return Book.update({
-      bookNum: bookNum,
-    }, {
-      $set: book
-    }).exec();
-  },
-};
-```
-
-Chapter
-
-```
-const Chapter = require('../lib/mongo').Chapter;
-
-module.exports = {
-  // 保存章节内容
-  create: (chapter) => {
-    return Chapter.create(chapter).exec();
-  },
-  //通过书编号获取记录
-  getChapterByBookNum: (bookNum) => {
-    return Chapter
-      .find({
-        bookNum: bookNum
-      })
-      .addCreatedAt()
-      .exec();
-  },
-  //通过抓取结果序号获取记录
-  getChapterById: (id) => {
-    return Chapter
-      .findOne({
-        _id: id
-      })
-      .addCreatedAt()
-      .exec();
-  },
-  updateChapterByBookNum: (id, chapter) => {
-    return Chapter.update({
-      _id: id
-    }, {
-      $set: chapter
-    }).exec();
-  },
-};
-```
-
-测试🌰(暂未使用断言库进行标准的测试)
-
-```
-const BookModel = require('../model/Books.js');
-const ChapterModel = require('../model/Chapters.js');
-
-
-
-var testStoreBook = async() => {
-	//模拟数据
-	let data = {
-			bookNum: "4445",
-			url: "www.google123.com",
-			chapters: [{
-				index: 5,
-				link: "333",
-				title: "123132"
-			}, {
-				index: 6,
-				link: "333",
-				title: "123132"
-			}, {
-				index: 7,
-				link: "333",
-				title: "123132"
-			}]
-		},
-		bookNum = "4445"
-
-	try {
-		var query = await BookModel.getBookByBookNum(bookNum);
-		// var result = await BookModel.create(data);
-	} catch (e) {
-		console.log(e)
-	}
-	console.log(result.result.ok)
-		// process.exit()
-}
-var testStoreChapters = async() => {
-		//模拟数据
-		let data = {
-				bookNum: "4445",
-				start: 0,
-				end: 10,
-				chapters: [{
-					index: 5,
-					code: 1,
-					filePath: "123132"
-				}, {
-					index: 6,
-					code: 1,
-					filePath: "123132"
-				}, {
-					index: 7,
-					code: 1,
-					filePath: "123132"
-				}]
-			},
-			bookNum = "4445"
-
-		try {
-			// var result = await ChapterModel.updateChapterByBookNum(bookNum, data);
-			var result = await ChapterModel.getChapterByBookNum(bookNum);
-			console.log(result)
-		} catch (e) {
-			console.log(e)
-		}
-	// console.log(result.result.ok)
-			// process.exit()
-	}
-	(async function() {
-		try {
-			// await testStoreChapters()
-			// var query = await testStoreBook()
-			var query = await testStoreChapters()
-		} catch (e) {
-			console.log(e.message)
-		}
-	})()
-	
-```
-
-
-### 结合mongolass保存抓取数据
-
-存储章节信息
-
-```
-const BookModel = require('./model/Books.js');
-// ...
-if (!dataList || data.length <= 0) {
-		return
-	}
-	/*储存数据*/
-	let book = {
-			bookNum: data.bookNumber,
-			url: data.url,
-			chapters: dataList,
-		},
-		result = await BookModel.create(book);
-	console.log(result)
-//...
-```
-输出结果
-![](media/14995008770629/14996015073753.jpg)
-
-
-存储章节内容
-
-```
-
-const ChapterModel = require('./model/Chapters.js');
-
-//....
-	try {
-		fetchResult = await delayAsync(dataList, start, end, limit);
-		console.log(fetchResult)
-		var chapters = await Chapter.create({
-			bookNum: data.bookNumber,
-			start: start,
-			end: end,
-			chapters: fetchResult,
-		});
-		console.log(chapters)
-	} catch (e) {
-		console.log(e)
-	}
-```
-
-输出结果
-
-![](media/14995008770629/14996075014567.jpg)
+### 获取章节保存到本地json文件中
+这里使用的node的fs文件的fs.writeFile模块
 
 
 ### 反思
-目前感觉总体设计上并不是十分合理。
+书本的章节可以捕获一次保存在/mock/bookInfo.json本地文件中,输入书本后判断书本是否已经捕获过章节了
 
-书本的章节可以捕获一次保存在数据库中,输入书本后判断书本是否已经捕获过章节了
-
-捕获过就从数据库里获取需要的章节,提供方法检验是否有最新章节,
+捕获过就从本地文件/mock/bookInfo.json中获取需要的章节,提供方法检验是否有最新章节,
 
 以文本形式储存阅读并不方便,如何更方便的阅读
 
@@ -1037,7 +839,8 @@ const ChapterModel = require('./model/Chapters.js');
 
 添加phantom proxy 进行代理,这里引出需要写一个抓取代理并测试的服务来提供代理池
 
-
-
 (ps =,=寝室只能用热点上网 实在网络不顺畅)
 
+### 参考
+
+[本文参考](https://github.com/Sunshine168/fetch-novel)
