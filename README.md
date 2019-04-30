@@ -35,6 +35,8 @@ http://www.qu.la/book/5443
 .
 ├── README.md  
 ├── asyncFetch.js  
+├── book
+│   └── default
 ├── mock
 │   └── bookInfo.json
 ├── fetchAllChapters.js
